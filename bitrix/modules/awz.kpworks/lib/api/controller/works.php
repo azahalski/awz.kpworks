@@ -259,14 +259,13 @@ class Works extends Controller
         $entCodesToId = [];
         $entCodes = [];
         $entCodesAdd = [];
-        if(Loader::includeModule('awz.bxapi')){
-            $entCodesAr = \Awz\Kpworks\Helper::entityCodes();
-            foreach($entCodesAr as $ent){
-                $entIdToCodes[$ent['ID']] = $ent['MIN_CODE'];
-                $entCodes[$ent['ID']] = $ent['CODE'];
-                $entCodesAdd['crm.'.mb_strtolower($ent['CODE']).'.add'] = $ent['ID'];
-                $entCodesToId[$ent['MIN_CODE']] = $ent['ID'];
-            }
+
+        $entCodesAr = \Awz\Kpworks\Helper::entityCodes();
+        foreach($entCodesAr as $ent){
+            $entIdToCodes[$ent['ID']] = $ent['MIN_CODE'];
+            $entCodes[$ent['ID']] = $ent['CODE'];
+            $entCodesAdd['crm.'.mb_strtolower($ent['CODE']).'.add'] = $ent['ID'];
+            $entCodesToId[$ent['MIN_CODE']] = $ent['ID'];
         }
 
         $r = \Awz\Kpworks\Custom\AppParamsTable::getList([
@@ -326,7 +325,7 @@ class Works extends Controller
             $phone = preg_replace('/([^0-9])/is','',$workData['SUBJECT']);
         }
 
-        $SUBJECT_MAIN = trim(preg_replace('/(re:|fwd:)/is','',$workData['SUBJECT']));
+        $SUBJECT_MAIN = trim(preg_replace('/(re:|fwd:|fw:)/is','',$workData['SUBJECT']));
         $SUBJECT_SQ = '';
         $SUBJECT_SQS = [];
         $MSG_SQS = [];
@@ -723,7 +722,7 @@ class Works extends Controller
                             if($checkDel){
                                 $bindsResData = $workBinds;
                                 foreach($bindsResData as $rowBind){
-                                    $tmpkey = $rowBind['entityTypeId'].'_'.$rowBind['entityId'];
+                                    $tmpkey = $rowBind['OWNER_TYPE_ID'].'_'.$rowBind['OWNER_ID'];
                                     $checkDelRow = false;
                                     if($action['checker'] == 'v1'){
                                         if(!in_array($tmpkey, $entityEntities)){
@@ -737,11 +736,11 @@ class Works extends Controller
                                             'method'=>'crm.activity.binding.delete',
                                             'params'=>[
                                                 'activityId'=>$workId,
-                                                'entityTypeId'=>$rowBind['entityTypeId'],
-                                                'entityId'=>$rowBind['entityId'],
+                                                'entityTypeId'=>$rowBind['OWNER_TYPE_ID'],
+                                                'entityId'=>$rowBind['OWNER_ID'],
                                             ]
                                         ];
-                                        $logEntities_unbind[] = $rowBind['entityTypeId'].'_'.$rowBind['entityId'];
+                                        $logEntities_unbind[] = $rowBind['OWNER_TYPE_ID'].'_'.$rowBind['OWNER_ID'];
                                         $groupLastRuleExists = $rule;
                                         if($variant == 'OR') break;
                                     }
@@ -768,7 +767,8 @@ class Works extends Controller
                             if(substr($action['value'],-4)=='.add'){
 
                                 $findId = 0;
-                                $firldsadd = $action['paramsjson']['fields'] ?? $action['paramsjson']['FIELDS'];
+                                $firldsadd = $action['paramsjson']['fields'] ? $action['paramsjson']['fields'] : $action['paramsjson']['FIELDS'];
+                                if(!is_array($firldsadd)) $firldsadd = [];
                                 if($action['value'] == 'crm.lead.add'){
                                     $leadObject = new \CCrmLead(false);
                                     $findId = $leadObject->Add(
@@ -796,7 +796,7 @@ class Works extends Controller
                                     $findId = $item->getId();
                                 }
                                 if($findId){
-                                    $tmp_type = $action['paramsjson']['entityTypeId'] ?? $entCodesAdd[$action['value']];
+                                    $tmp_type = $entCodesAdd[$action['value']] ?? $action['paramsjson']['entityTypeId'];
                                     $cmds[$tmp_type.'_'.$findId] = [
                                         'method'=>'crm.activity.binding.add',
                                         'params'=>[
@@ -1236,10 +1236,21 @@ class Works extends Controller
                                         ];
                  */
                 elseif($cmd['method'] == 'crm.activity.binding.delete'){
-                    \CCrmActivity::DeleteBinding($cmd['params']['activityId'], [
-                        'OWNER_TYPE_ID'=>$cmd['params']['entityTypeId'],
-                        'OWNER_ID'=>$cmd['params']['entityId'],
-                    ]);
+
+                    // 1. Получаем текущие связи дела
+                    $currentBindings = \CCrmActivity::GetBindings($cmd['params']['activityId']);
+                    $newBindings = [];
+                    foreach($currentBindings as $bind){
+                        if($bind['OWNER_TYPE_ID'] == $cmd['params']['entityTypeId'] &&
+                            $bind['OWNER_ID'] === (int)$cmd['params']['entityId']
+                        ){
+                           continue;
+                        }
+                        $newBindings[] = $bind;
+                    }
+
+                    \CCrmActivity::SaveBindings($cmd['params']['activityId'], $newBindings);
+
                 }
                 /*$cmds[$tmp_type.'_'.$findId] = [
                         'method'=>'crm.activity.binding.add',
@@ -1251,10 +1262,13 @@ class Works extends Controller
                     ];
                 */
                 elseif($cmd['method'] == 'crm.activity.binding.add'){
-                    \CCrmActivity::AddBinding($cmd['params']['activityId'], [
+                    $currentBindings = \CCrmActivity::GetBindings($cmd['params']['activityId']);
+                    $currentBindings[] = [
                         'OWNER_TYPE_ID'=>$cmd['params']['entityTypeId'],
                         'OWNER_ID'=>$cmd['params']['entityId'],
-                    ]);
+                    ];
+                    \CCrmActivity::SaveBindings($cmd['params']['activityId'], $currentBindings);
+                    //print_r([$cmd['params']['activityId'], $currentBindings]);
                 }
             }
 
