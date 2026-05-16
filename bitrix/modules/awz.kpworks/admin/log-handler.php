@@ -57,6 +57,9 @@ $request = \Bitrix\Main\Application::getInstance()->getContext()->getRequest();
                 '7'=>'quote',
                 '14'=>'order'
         ];
+        foreach(\Awz\Kpworks\Helper::entityCodes() as $ent){
+            $crmOrSmartIds[$ent['MIN_CODE']] = strtolower($ent['CODE']);
+        }
         $filter = [];
         $filter['=APP']= 'default';
         $filter['=PORTAL']= 'default';

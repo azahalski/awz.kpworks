@@ -191,8 +191,7 @@ class Works extends Controller
                 $params['order'],
                 $params['filter'],
                 false, // Группировка
-                false, // Навигация
-                $params['select'],
+                ['nPageSize'=>50], // Навигация
                 ['CHECK_PERMISSIONS' => 'N'] // 'N' - если нужно искать по всем делам, игнорируя права текущего юзера
             );
 
@@ -223,9 +222,43 @@ class Works extends Controller
                     {
                         $bindings = \CCrmActivity::GetBindings($workData['ID']);
                         foreach ($bindings as $binding) {
+
+                            $ownerTypeId = (int)($binding['OWNER_TYPE_ID'] ?? $binding['entityTypeId']);
+                            $ownerId = (int)($binding['OWNER_ID'] ?? $binding['entityId']);
+
+                            // Проверяем сущности, у которых могут быть финальные стадии
+                            $typesWithStages = [
+                                \CCrmOwnerType::Deal,     // 2 - Сделка
+                                \CCrmOwnerType::Lead,     // 1 - Лид
+                                \CCrmOwnerType::Order,    // 14 - Заказ
+                            ];
+
+                            // Добавляем проверку на динамические смарт-процессы (их ID обычно > 1000)
+                            if (in_array($ownerTypeId, $typesWithStages) || \CCrmOwnerType::isPossibleDynamicTypeId($ownerTypeId)) {
+
+                                // Получаем фабрику для данной сущности через современное CRM API
+                                $factory = \Bitrix\Crm\Service\Container::getInstance()->getFactory($ownerTypeId);
+
+                                if ($factory && $factory->isStagesSupported()) {
+                                    // Быстро запрашиваем только стадию элемента
+                                    $item = $factory->getItem($ownerId, ['STAGE_ID']);
+
+                                    if ($item) {
+                                        $stageId = $item->getStageId();
+                                        // Получаем семантику стадии (Success, Failure, Process)
+                                        $semanticId = $factory->getStageSemantics($stageId);
+
+                                        // Если стадия финальная (успех или провал) — игнорируем этот биндинг
+                                        if (\Bitrix\Crm\PhaseSemantics::isFinal($semanticId)) {
+                                            continue;
+                                        }
+                                    }
+                                }
+                            }
+
                             $entityRow = [
-                                'entityTypeId'=>$binding['OWNER_TYPE_ID'] ?? $binding['entityTypeId'],
-                                'entityId'=>$binding['OWNER_ID'] ?? $binding['entityId']
+                                'entityTypeId'=>$ownerTypeId,
+                                'entityId'=>$ownerId
                             ];
                             $searchData[$key][] = $entityRow;
                         }
@@ -991,8 +1024,6 @@ class Works extends Controller
                             }
                         }
 
-
-
                         $log?->debug(
                             "[rule action] - {date} | {action} | {filter}\n",
                             [
@@ -1551,7 +1582,7 @@ class Works extends Controller
                 $jsonStr = str_replace(':'.$k, ':"'.$k.'"', $jsonStr);
                 try{
                     $tst = Json::decode($v);
-                    $jsonStr = str_replace('"'.$k.'"', ''.$v, $jsonStr);
+                    $jsonStr = str_replace('"'.$k.'"', ''.str_replace('"','\"',$v), $jsonStr);
                 }catch (\Exception $e){
                     $jsonStr = str_replace('"'.$k.'"', Json::encode($v), $jsonStr);
                 }
