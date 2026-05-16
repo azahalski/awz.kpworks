@@ -1069,7 +1069,7 @@ $request = \Bitrix\Main\Application::getInstance()->getContext()->getRequest();
         <script>
             $(document).ready(function(){
                 window.AwzAppInstance = new AwzApp({
-                    endpointUrl: 'https://<?=Application::getInstance()->getContext()->getServer()->getHttpHost()?>/bitrix/services/main/ajax.php?action=awz:kpworks.api.works.',
+                    endpointUrl: '/bitrix/services/main/ajax.php?action=awz:kpworks.api.works.',
                     noHandlers: true,
                 });
                 let condRules = <?=\Bitrix\Main\Web\Json::encode($condRules)?>;
