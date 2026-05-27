@@ -20,6 +20,7 @@ Loc::loadMessages(__FILE__);
 
 class Works extends Controller
 {
+    public static $lastAddId = 0;
 
     public function configureActions()
     {
@@ -513,7 +514,8 @@ class Works extends Controller
                         '#SUBJECT_SQ#'=>$SUBJECT_SQ,
                         '#SUBJECT_MAIN#'=>$SUBJECT_MAIN,
                         '#SUBJECT_SQS#'=>Json::encode($SUBJECT_SQS),
-                        '#MSG_SQS#'=>Json::encode($MSG_SQS)
+                        '#MSG_SQS#'=>Json::encode($MSG_SQS),
+                        '#ADD_ID#'=>self::$lastAddId
                     ];
                     foreach($workData as $k=>$v){
                         if(is_string($v)){
@@ -803,22 +805,41 @@ class Works extends Controller
                                 $firldsadd = $action['paramsjson']['fields'] ? $action['paramsjson']['fields'] : $action['paramsjson']['FIELDS'];
                                 if(!is_array($firldsadd)) $firldsadd = [];
                                 if($action['value'] == 'crm.lead.add'){
+                                    $errorsBp = [];
                                     $leadObject = new \CCrmLead(false);
                                     $findId = $leadObject->Add(
                                         $firldsadd,
                                         true, // bUpdateSearch: обновлять поисковый индекс
                                         ['REGISTER_SONET_EVENT' => true] // Регистрация события в живой ленте
                                     );
+                                    if($findId) {
+                                        \CCrmBizProcHelper::AutoStartWorkflows(
+                                            \CCrmOwnerType::Lead,
+                                            $findId,
+                                            \CCrmBizProcEventType::Create,
+                                            $errorsBp
+                                        );
+                                    }
                                 }
                                 if($action['value'] == 'crm.deal.add'){
                                     $leadObject = new \CCrmDeal(false);
+                                    $errorsBp = [];
                                     $findId = $leadObject->Add(
                                         $firldsadd,
                                         true, // bUpdateSearch: обновлять поисковый индекс
                                         ['REGISTER_SONET_EVENT' => true] // Регистрация события в живой ленте
                                     );
+                                    if($findId) {
+                                        \CCrmBizProcHelper::AutoStartWorkflows(
+                                            \CCrmOwnerType::Deal,
+                                            $findId,
+                                            \CCrmBizProcEventType::Create,
+                                            $errorsBp
+                                        );
+                                    }
                                 }
                                 if($action['value'] == 'crm.item.add'){
+                                    $errorsBp = [];
                                     $container = Service\Container::getInstance();
                                     $factory = $container->getFactory($action['paramsjson']['entityTypeId']);
                                     $item = $factory->createItem();
@@ -827,6 +848,14 @@ class Works extends Controller
                                     }
                                     $factory->getAddOperation($item)->launch();
                                     $findId = $item->getId();
+                                    if($findId){
+                                        \CCrmBizProcHelper::AutoStartWorkflows(
+                                            (int)$action['paramsjson']['entityTypeId'],
+                                            $findId,
+                                            \CCrmBizProcEventType::Create,
+                                            $errorsBp
+                                        );
+                                    }
                                 }
                                 if($findId){
                                     $tmp_type = $entCodesAdd[$action['value']] ?? $action['paramsjson']['entityTypeId'];
@@ -838,6 +867,7 @@ class Works extends Controller
                                             'entityId'=>$findId
                                         ]
                                     ];
+                                    self::$lastAddId = $findId;
                                 }
 
                             }else{
@@ -1233,7 +1263,7 @@ class Works extends Controller
                 if($cmd['method'] == 'bizproc.workflow.start'){
                     if (Loader::includeModule('bizproc') && Loader::includeModule('crm')) {
                         $errors = [];
-                        \CBBPasteWorkflow::StartWorkflow(
+                        \CBPDocument::StartWorkflow(
                             $cmd['params']['TEMPLATE_ID'],
                             $cmd['params']['DOCUMENT_ID'],
                             $cmd['params']['PARAMETERS'],
