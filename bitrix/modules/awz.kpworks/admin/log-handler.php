@@ -84,7 +84,7 @@ $request = \Bitrix\Main\Application::getInstance()->getContext()->getRequest();
         <div class="container">
             <div class="row">
                 <div class="ui-block-title">
-                    <div class="ui-block-title-text h2">Лог обработки <?if($request->get('id')){?>маршрута ID: <?=$request->get('id')?><?}else{?> всех маршрутов<?}?></div>
+                    <div class="ui-block-title-text h2">Лог обработки <?if($request->get('id')){?>маршрута ID: <?=(int)$request->get('id')?><?}else{?> всех маршрутов<?}?></div>
                 </div>
             </div>
             <?foreach($logItems as $logItem){

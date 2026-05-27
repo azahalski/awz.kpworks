@@ -1418,6 +1418,12 @@ class Works extends Controller
             return [];
         }
 
+        $isWrite = ($delete === 'Y' || $preset > 0 || !$id || $id > 0);
+        if($isWrite && !AccessController::can(0, ActionDictionary::ACTION_SETT_EDIT)){
+            $this->addError(new Error("Нет прав на изменение правил"));
+            return null;
+        }
+
         if($preset == 1){
             $check = \Awz\Kpworks\Custom\AppParamsTable::getList([
                 'select'=>['ID'],
