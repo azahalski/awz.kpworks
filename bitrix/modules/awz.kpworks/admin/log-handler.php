@@ -108,9 +108,14 @@ $request = \Bitrix\Main\Application::getInstance()->getContext()->getRequest();
                                     echo $ent;
                                 }
                             }elseif($logItem['PARAMS']['type']=='rest'){
+                                //echo'<pre>';print_r($ent);echo'</pre>';
                                 $entData = explode('|||',$ent);
                                 echo $entData[0].' - ';
                                 echo print_r($entData[2], true);
+                                if(isset($crmOrSmartIds[$entData[2]['entityTypeId']])){
+                                    $path = '/crm/'.$crmOrSmartIds[$entData[2]['entityTypeId']].'/details/'.$entData[3].'/';
+                                    echo '<a class="awz-handler-slide" target="_blank" href="'.$path.'">'.$ent.'</a>';
+                                }
                             }else{
                                 $entData = explode('_',$ent);
                                 $path = '/crm/type/'.$entData[0].'/details/'.$entData[1].'/';

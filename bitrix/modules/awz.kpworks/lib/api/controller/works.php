@@ -59,6 +59,13 @@ class Works extends Controller
         if(!$value) return [];
         if(!Loader::includeModule('crm')) return [];
         $logger = \Bitrix\Main\Diag\Logger::create('AwzKpworksWorks', [null]);
+        $logger?->debug(
+            "[getSearch] - {type} - {value}\n",
+            [
+                'value' => $value,
+                'type' => $type
+            ]
+        );
         $filter = [];
         if($type == 'contact_expert_json'){
             try{
@@ -83,10 +90,9 @@ class Works extends Controller
         }
 
         $logger?->debug(
-            "[getSearch] - {type} - {value}\n",
+            "[getSearch] - {filter}\n",
             [
-                'value' => $value,
-                'type' => $type
+                'filter' => $filter
             ]
         );
 
@@ -193,6 +199,7 @@ class Works extends Controller
                 $params['filter'],
                 false, // Группировка
                 ['nPageSize'=>50], // Навигация
+                [],
                 ['CHECK_PERMISSIONS' => 'N'] // 'N' - если нужно искать по всем делам, игнорируя права текущего юзера
             );
 
@@ -210,10 +217,11 @@ class Works extends Controller
                     $emailTo = !empty($emailsTo) ? $emailsTo[0] : '';
 
                     $logger?->debug(
-                        "[emails] - {emailFrom} - {emailTo}\n",
+                        "[emails] - {emailFrom} - {emailTo} - {workData}\n",
                         [
                             'emailFrom' => $emailFrom,
                             'emailTo' => $emailTo,
+                            'workData'=>$workData
                         ]
                     );
                     if(
@@ -819,6 +827,9 @@ class Works extends Controller
                                             \CCrmBizProcEventType::Create,
                                             $errorsBp
                                         );
+                                        $starter = new \Bitrix\Crm\Automation\Starter(\CCrmOwnerType::Lead, $findId);
+                                        $starter->setUserIdFromCurrent();
+                                        $starter->runOnAdd();
                                     }
                                 }
                                 if($action['value'] == 'crm.deal.add'){
@@ -836,6 +847,9 @@ class Works extends Controller
                                             \CCrmBizProcEventType::Create,
                                             $errorsBp
                                         );
+                                        $starter = new \Bitrix\Crm\Automation\Starter(\CCrmOwnerType::Deal, $findId);
+                                        $starter->setUserIdFromCurrent();
+                                        $starter->runOnAdd();
                                     }
                                 }
                                 if($action['value'] == 'crm.item.add'){
@@ -855,6 +869,9 @@ class Works extends Controller
                                             \CCrmBizProcEventType::Create,
                                             $errorsBp
                                         );
+                                        $starter = new \Bitrix\Crm\Automation\Starter((int)$action['paramsjson']['entityTypeId'], $findId);
+                                        $starter->setUserIdFromCurrent();
+                                        $starter->runOnAdd();
                                     }
                                 }
                                 if($findId){
